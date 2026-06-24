@@ -1096,8 +1096,7 @@ async function testarConexao() {
     const res  = await fetch(zApiUrl('status'), { method:'GET' });
     const data = await res.json();
     console.log('Z-API status:', data); // debug
-    // Z-API retorna { connected, smartphoneConnected, session, ... }
-    const conectado = data?.connected === true || data?.smartphoneConnected === true;
+    const conectado = data?.connected === true && data?.smartphoneConnected === true;
     state.conectado = conectado;
     document.getElementById('conn-dot').className = 'dot ' + (conectado ? '' : 'off');
     document.getElementById('conn-text').textContent = conectado ? 'Conectado' : 'Desconectado';
@@ -1105,7 +1104,7 @@ async function testarConexao() {
     document.getElementById('api-status-text').textContent = conectado
       ? '✅ WhatsApp conectado e pronto para disparar'
       : '⚠️ API configurada — WhatsApp não conectado. Escaneie o QR Code.';
-    toast(conectado ? 'WhatsApp conectado ✓' : 'API ok, mas WhatsApp desconectado — escaneie o QR', conectado ? 'success' : 'warn');
+    toast(conectado ? 'WhatsApp conectado ✓' : 'WhatsApp desconectado — escaneie o QR', conectado ? 'success' : 'warn');
   } catch(e) {
     console.error('Z-API erro:', e);
     document.getElementById('api-status-text').textContent = '✗ Erro — verifique Instance ID e Token';
@@ -1647,10 +1646,69 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 });
 
+// =================== AGENDAMENTO AUTOMÁTICO ===================
+async function verificarAgendamentos() {
+  if(!state.conectado) return; // só dispara se estiver conectado
+  const agora = new Date();
+  const horaAtual = agora.getHours().toString().padStart(2,'0') + ':' + agora.getMinutes().toString().padStart(2,'0');
+  const diaAtual  = agora.getDay(); // 0=Dom ... 6=Sáb
+  const dataAtual = agora.toISOString().slice(0,10); // YYYY-MM-DD
+
+  for(const ag of state.agendamentos) {
+    if(!ag.ativo) continue;
+    if(ag.hora !== horaAtual) continue;
+    if(!ag.dias.includes(diaAtual)) continue;
+
+    // Verifica data de início
+    if(ag.dataInicio && ag.dataInicio > dataAtual) continue;
+
+    // Evita disparar duas vezes no mesmo minuto
+    const chave = `disparado_${ag.id}_${dataAtual}_${horaAtual}`;
+    if(state[chave]) continue;
+    state[chave] = true;
+
+    // Dispara cada modelo vinculado
+    for(const modeloId of (ag.modeloIds || [])) {
+      const modelo = state.modelos.find(m => m.id === modeloId);
+      if(!modelo) continue;
+
+      // Gera imagem para esse modelo
+      state.cidadesSelecionadas = new Set(modelo.cidadeIdxs);
+      await new Promise(r => setTimeout(r, 500)); // aguarda geração
+      gerarTabelaImagem();
+      await new Promise(r => setTimeout(r, 1500)); // aguarda canvas
+
+      const contatos = state.contatos.filter(c => modelo.contatoIds.includes(c.id));
+      const legenda  = `E. F. Gelati — Preços Soja 2026/27`;
+      const intervalo = 5000;
+
+      toast(`⏰ Agendamento "${ag.nome}" — disparando "${modelo.nome}" para ${contatos.length} contato${contatos.length!==1?'s':''}...`, 'success');
+
+      for(let i = 0; i < contatos.length; i++) {
+        const c = contatos[i];
+        if(i > 0) await new Promise(r => setTimeout(r, intervalo));
+        try {
+          await enviarImagemZApi(c.fone, state.canvasAtual, legenda);
+          state.historico.unshift({dt:dataHoraAgora(), dest:c.nome, tipo:`⏰ ${ag.nome}`, status:'ok'});
+        } catch(e) {
+          state.historico.unshift({dt:dataHoraAgora(), dest:c.nome, tipo:`⏰ ${ag.nome}`, status:'fail'});
+          toast(`Falha ao enviar para ${c.nome}: ${e.message}`, 'error');
+        }
+        renderHistorico();
+      }
+      toast(`✓ Agendamento "${ag.nome}" — "${modelo.nome}" concluído`, 'success');
+    }
+  }
+}
+
 window.addEventListener('DOMContentLoaded',()=>{
   _carregarLogo(); // pré-carrega logo imediatamente
   renderTudo();
-  setInterval(gerarTabelaImagem,60000);
+  setInterval(gerarTabelaImagem, 60000);
+
+  // Verifica agendamentos a cada minuto
+  setInterval(verificarAgendamentos, 60000);
+  verificarAgendamentos(); // verifica imediatamente ao abrir
 });
 </script>
 </body>
