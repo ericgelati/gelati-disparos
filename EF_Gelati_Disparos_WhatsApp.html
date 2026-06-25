@@ -228,17 +228,30 @@
 
 <div class="main">
   <aside>
-    <!-- UPLOAD PLANILHA -->
+    <!-- GOOGLE SHEETS / UPLOAD -->
     <div class="side-section">
       <div class="side-label">Planilha de Preços</div>
+
+      <!-- Botão principal: atualizar via Google Sheets -->
+      <button onclick="atualizarViaSheets()" id="btn-sheets"
+        style="width:100%;background:var(--verde);color:white;border:none;border-radius:8px;padding:11px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--sans);display:flex;align-items:center;justify-content:center;gap:7px;transition:background .2s;margin-bottom:8px">
+        <span style="font-size:16px">🔄</span> Atualizar Preços (Sheets)
+      </button>
+      <div id="sheets-status" style="display:none;margin-bottom:8px;padding:8px 10px;border-radius:6px;font-size:11px"></div>
+
+      <!-- Upload manual como fallback -->
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+        <div style="flex:1;height:1px;background:var(--cinza-2)"></div>
+        <span style="font-size:10px;color:var(--cinza-3)">ou</span>
+        <div style="flex:1;height:1px;background:var(--cinza-2)"></div>
+      </div>
       <div id="upload-area" onclick="document.getElementById('input-xlsx').click()"
-        style="border:2px dashed var(--cinza-2);border-radius:8px;padding:14px 10px;text-align:center;cursor:pointer;transition:all .2s;background:var(--cinza-1)">
-        <div style="font-size:22px;margin-bottom:4px">📂</div>
-        <div style="font-size:12px;font-weight:600;color:var(--verde)">Clique para carregar</div>
-        <div style="font-size:10px;color:var(--cinza-3);margin-top:2px">Preços_Soja_2026.xlsx</div>
+        style="border:1px dashed var(--cinza-2);border-radius:7px;padding:10px;text-align:center;cursor:pointer;transition:all .2s;background:var(--cinza-1)">
+        <div style="font-size:14px;margin-bottom:2px">📎</div>
+        <div style="font-size:11px;color:var(--cinza-3)">Upload manual (.xlsx)</div>
       </div>
       <input type="file" id="input-xlsx" accept=".xlsx,.xls" style="display:none" onchange="lerPlanilha(this)" />
-      <div id="upload-status" style="display:none;margin-top:8px;padding:8px 10px;border-radius:6px;font-size:11px"></div>
+      <div id="upload-status" style="display:none;margin-top:6px;padding:7px 10px;border-radius:6px;font-size:11px"></div>
     </div>
 
     <!-- MÊS -->
@@ -1501,7 +1514,110 @@ function salvarModelo() {
   renderModelos();
 }
 
-// =================== UPLOAD PLANILHA ===================
+// =================== GOOGLE SHEETS ===================
+const SHEETS_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTjMOH5XE2iTngwJd4X4gevzYZ2Be4rL3nCg1eDeYv15hrozPvGFwfkKWnICxP0ERlXW5Br4gvHfAdi/pub?gid=659099410&single=true&output=csv';
+
+async function atualizarViaSheets() {
+  const btn = document.getElementById('btn-sheets');
+  const statusEl = document.getElementById('sheets-status');
+  btn.innerHTML = '<span style="font-size:16px">⏳</span> Buscando preços...';
+  btn.style.background = '#C8920A';
+  btn.disabled = true;
+  statusEl.style.display = 'block';
+  statusEl.style.background = '#FEF7E6';
+  statusEl.style.color = '#C8920A';
+  statusEl.textContent = 'Conectando ao Google Sheets...';
+
+  try {
+    // Usa proxy CORS para acessar o CSV do Google Sheets
+    const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(SHEETS_CSV_URL);
+    const res = await fetch(proxyUrl);
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    const csv = await res.text();
+    const atualizados = processarCSVSheets(csv);
+
+    if(atualizados === 0) throw new Error('Nenhum preço reconhecido no CSV.');
+
+    statusEl.style.background = '#D4F4E2';
+    statusEl.style.color = '#0F6B38';
+    statusEl.innerHTML = `✓ <strong>${atualizados} preços atualizados</strong> do Google Sheets`;
+    btn.innerHTML = '<span style="font-size:16px">✅</span> Preços Atualizados';
+    btn.style.background = '#1A7A4A';
+
+    renderCidades();
+    gerarTabelaImagem();
+    if(document.getElementById('ativar-mudanca')?.checked) {
+      document.getElementById('banner-mudanca').style.display = 'flex';
+    }
+    toast(`${atualizados} preços atualizados do Google Sheets`, 'success');
+
+  } catch(err) {
+    statusEl.style.background = '#FAE0DE';
+    statusEl.style.color = '#C0392B';
+    statusEl.textContent = '✗ Erro: ' + err.message;
+    btn.innerHTML = '<span style="font-size:16px">🔄</span> Atualizar Preços (Sheets)';
+    btn.style.background = 'var(--verde)';
+    toast('Erro ao buscar planilha: ' + err.message, 'error');
+  }
+  btn.disabled = false;
+}
+
+function processarCSVSheets(csv) {
+  // Converte CSV para array de linhas/colunas
+  const rows = csv.split('\n').map(r => {
+    // Parse CSV respeitando aspas
+    const cols = [];
+    let cur = '', inQ = false;
+    for(let i = 0; i < r.length; i++) {
+      if(r[i] === '"') { inQ = !inQ; }
+      else if(r[i] === ',' && !inQ) { cols.push(cur.trim()); cur = ''; }
+      else { cur += r[i]; }
+    }
+    cols.push(cur.trim());
+    return cols;
+  });
+
+  const MESES_IDX = {'fevereiro':0,'março':1,'marco':1,'abril':2,'maio':3,'junho':4};
+  const BLOCOS = [[0,1],[4,5],[8,9],[13,14]];
+  const mapaCidades = buildMapaCidades();
+  let atualizados = 0;
+
+  rows.forEach((row, ri) => {
+    BLOCOS.forEach(([colNome, colPreco]) => {
+      const cel = String(row[colNome] || '').trim().toUpperCase();
+      if(cel.includes('SOJA') || (cel.includes('REGIÃO') && cel.length > 5) || cel.includes('CRC') || cel.includes('CIF')) {
+        for(let offset = 1; offset <= 10; offset++) {
+          const r2 = rows[ri + offset];
+          if(!r2) break;
+          const mesCel = String(r2[colNome] || '').toLowerCase().trim();
+          const mesIdx = MESES_IDX[mesCel];
+          if(mesIdx === undefined) continue;
+          const val = parseFloat(String(r2[colPreco] || '').replace(',','.'));
+          if(isNaN(val) || val < 50) continue;
+
+          let nomeLimpo = cel
+            .replace(/E REGIÃO.*/i,'').replace(/SOJA.*/i,'').replace(/2026.*/i,'')
+            .replace(/ - .*/,'').replace(/REGIÃO\s+(DE\s+|CRC\s*\/\s*)?/i,'')
+            .trim().replace(/[-/]+$/,'').trim();
+          const nomeNorm = normalizarNome(nomeLimpo);
+          let cidadeIdx = mapaCidades[nomeNorm];
+          if(cidadeIdx === undefined) {
+            for(const [k,v] of Object.entries(mapaCidades)) {
+              if(nomeNorm.startsWith(k) || k.startsWith(nomeNorm.split(' ')[0])) {
+                cidadeIdx = v; break;
+              }
+            }
+          }
+          if(cidadeIdx !== undefined) {
+            state.precosEditados[cidadeIdx + '-' + mesIdx] = val;
+            atualizados++;
+          }
+        }
+      }
+    });
+  });
+  return atualizados;
+}
 // Mapa de normalização: nome na planilha → índice em DADOS_CIDADES
 function normalizarNome(n) {
   return n.toLowerCase()
