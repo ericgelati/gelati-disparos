@@ -531,45 +531,46 @@ const PAGAMENTOS = ['19/03/2027','20/04/2027','20/05/2027','18/06/2027','20/07/2
 // Preços brutos por cidade (R$/sc 60kg) — extraídos da planilha Preços_Soja_2026.xlsx
 // Estrutura: cidade -> { frete_fev, frete_mar, ... , preco_fev, preco_mar, ... }
 const DADOS_CIDADES = [
-  { nome:'Abaeté',       fretes:[12.6,15.0,15.0,14.4,13.8], precos:[124.4,122.0,132.0,137.6,0] },
-  { nome:'Alfenas',      fretes:[9.3,10.5,10.5,9.9,9.3],   precos:[127.7,126.5,136.5,142.1,0] },
-  { nome:'Araxá',        fretes:[13.2,15.0,15.0,14.4,13.8], precos:[123.8,122.0,132.0,137.6,0] },
-  { nome:'Arcos',        fretes:[11.4,13.2,13.2,12.6,12.0], precos:[125.6,123.8,133.8,139.4,0] },
-  { nome:'Bambuí',       fretes:[12.6,14.1,14.1,13.8,13.2], precos:[124.4,122.9,132.9,138.2,0] },
-  { nome:'Boa Esperança',fretes:[9.9,11.1,11.1,10.8,10.2],  precos:[127.1,125.9,135.9,141.2,0] },
-  { nome:'Bom Despacho', fretes:[12.6,14.1,14.1,13.8,13.2], precos:[121.4,119.0,129.0,129.0,0] },
-  { nome:'Bom Jesus da Penha',fretes:[10.5,11.7,11.7,11.4,10.8],precos:[126.5,125.3,135.3,140.6,0] },
-  { nome:'Cambuquira',   fretes:[9.0,9.9,9.9,9.0,9.0],      precos:[128.0,127.1,137.1,143.0,0] },
-  { nome:'Campanha',     fretes:[8.7,9.9,9.9,9.0,9.0],      precos:[128.3,127.1,137.1,143.0,0] },
-  { nome:'Campestre',    fretes:[9.9,10.8,10.8,10.5,9.9],   precos:[127.1,126.2,136.2,141.5,0] },
-  { nome:'Carrancas',    fretes:[12.9,14.7,14.7,13.8,13.2], precos:[124.1,122.3,132.3,138.2,0] },
-  { nome:'Conceição do Rio Verde',fretes:[10.2,11.4,11.4,10.8,10.2],precos:[126.8,125.6,135.6,141.2,0] },
-  { nome:'Cruzília/Minduri',fretes:[10.5,11.7,11.4,11.1,10.5],precos:[125.6,124.7,134.7,140.0,0] },
-  { nome:'Delfinópolis', fretes:[11.4,13.2,13.2,12.6,12.0], precos:[125.6,123.8,133.8,139.4,0] },
-  { nome:'Formiga',      fretes:[11.4,12.9,12.9,12.6,12.0], precos:[127.7,126.5,136.5,133.5,0] },
-  { nome:'Ibiá',         fretes:[13.2,15.3,15.3,14.7,13.8], precos:[123.8,121.7,131.7,137.3,0] },
-  { nome:'Ilicínea',     fretes:[10.5,11.7,11.7,11.4,10.8], precos:[126.5,125.3,135.3,140.6,0] },
-  { nome:'Itutinga',     fretes:[11.7,12.9,12.9,12.6,12.0], precos:[125.3,124.1,134.1,139.4,0] },
-  { nome:'Lagoa Dourada',fretes:[12.6,13.8,13.8,13.2,12.9], precos:[0,0,0,0,0] },
-  { nome:'Lavras',       fretes:[11.1,12.3,12.3,11.7,11.7], precos:[127.7,126.5,136.5,142.1,0] },
-  { nome:'Luminárias',   fretes:[11.4,12.3,12.3,12.0,12.0], precos:[125.6,124.7,134.7,140.0,0] },
-  { nome:'Madre de Deus',fretes:[11.7,13.2,13.2,12.9,12.3], precos:[125.3,123.8,133.8,139.1,0] },
-  { nome:'Martinho Campos',fretes:[12.6,15.0,15.0,14.4,13.5],precos:[0,0,0,0,0] },
-  { nome:'Morada Nova de Minas',fretes:[15.6,17.7,17.7,16.2,15.9],precos:[121.4,119.3,129.3,135.8,0] },
-  { nome:'Nazareno',     fretes:[11.4,12.6,12.6,12.0,11.7], precos:[125.6,124.4,134.4,140.0,0] },
-  { nome:'Paraguaçu',    fretes:[8.7,9.9,9.9,9.3,9.0],      precos:[128.3,127.1,137.1,142.7,0] },
-  { nome:'Passos',       fretes:[10.8,12.6,12.6,12.0,11.4], precos:[126.2,124.4,134.4,140.0,0] },
-  { nome:'Piumhi',       fretes:[12.3,13.8,13.8,12.9,12.6], precos:[124.7,123.2,133.2,139.1,0] },
-  { nome:'Pouso Alegre', fretes:[8.1,9.3,9.3,8.7,8.4],      precos:[124.7,122.3,132.3,137.9,0] },
-  { nome:'Pratápolis',   fretes:[11.1,12.0,12.0,11.4,11.1], precos:[125.9,125.0,135.0,140.6,0] },
-  { nome:'S. J. del Rei/Prados',fretes:[12.0,13.2,13.2,13.2,12.0],precos:[123.8,122.0,132.0,137.6,0] },
-  { nome:'São Bento Abade',fretes:[9.9,11.1,11.1,10.5,10.2],precos:[127.1,125.9,135.9,141.5,0] },
-  { nome:'São Gonçalo do Sapucaí',fretes:[8.7,9.6,9.6,9.3,9.0],precos:[128.3,127.4,137.4,142.7,0] },
-  { nome:'São José da Barra',fretes:[11.1,12.3,12.3,11.4,11.1],precos:[125.9,124.7,134.7,140.6,0] },
-  { nome:'São Vicente de Minas',fretes:[10.5,12.0,12.0,11.1,11.1],precos:[126.5,125.0,135.0,140.9,0] },
-  { nome:'Três Corações',fretes:[9.0,9.9,9.9,9.3,9.3],      precos:[128.0,127.1,137.1,142.7,0] },
-  { nome:'Três Pontas',  fretes:[9.6,10.8,10.8,10.2,9.9],   precos:[127.4,126.2,136.2,141.8,0] },
-  { nome:'CIF Santos/Guarujá',fretes:[0,0,0,0,0],           precos:[137.0,137.0,147.0,152.0,0] },
+  { nome:'ABAETÉ', fretes:[0,0,0,0,0], precos:[123.2, 121.1, 122.7, 122.7, 123.7] },
+  { nome:'ALFENAS', fretes:[0,0,0,0,0], precos:[126.2, 123.8, 124.8, 125.1, 126.7] },
+  { nome:'ARAXA', fretes:[0,0,0,0,0], precos:[121.7, 119.0, 120.0, 120.6, 122.2] },
+  { nome:'ARCOS', fretes:[0,0,0,0,0], precos:[123.8, 121.1, 122.7, 122.7, 124.3] },
+  { nome:'BAMBUÍ', fretes:[0,0,0,0,0], precos:[123.8, 121.1, 122.7, 122.7, 124.3] },
+  { nome:'BOA ESPERANÇA', fretes:[0,0,0,0,0], precos:[126.5, 124.1, 125.4, 125.4, 127.0] },
+  { nome:'BOM DESPACHO', fretes:[0,0,0,0,0], precos:[122.6, 120.5, 121.5, 122.1, 123.7] },
+  { nome:'BOM JESUS DA PENHA', fretes:[0,0,0,0,0], precos:[125.0, 122.6, 123.9, 123.9, 125.5] },
+  { nome:'CAMBUQUIRA', fretes:[0,0,0,0,0], precos:[127.4, 124.7, 125.7, 126.9, 127.9] },
+  { nome:'CAMPANHA', fretes:[0,0,0,0,0], precos:[127.1, 124.7, 125.7, 126.9, 127.9] },
+  { nome:'CAMPESTRE', fretes:[0,0,0,0,0], precos:[126.2, 123.8, 124.8, 125.1, 126.7] },
+  { nome:'CARRANCAS', fretes:[0,0,0,0,0], precos:[123.2, 120.5, 121.5, 122.7, 124.3] },
+  { nome:'CIF PORTO SANTOS/GUARUJÁ', fretes:[0,0,0,0,0], precos:[137.0, 135.5, 136.5, 136.5, 0] },
+  { nome:'CONCEIÇÃO DO RIO VERDE', fretes:[0,0,0,0,0], precos:[125.6, 122.9, 124.5, 125.1, 126.7] },
+  { nome:'CRUZILIA / MINDURI', fretes:[0,0,0,0,0], precos:[124.4, 121.1, 122.7, 122.7, 124.9] },
+  { nome:'DELFINÓPOLIS', fretes:[0,0,0,0,0], precos:[123.2, 121.1, 122.1, 122.7, 124.3] },
+  { nome:'FORMIGA', fretes:[0,0,0,0,0], precos:[124.4, 121.7, 123.3, 123.3, 124.9] },
+  { nome:'IBIÁ', fretes:[0,0,0,0,0], precos:[122.0, 119.0, 120.0, 120.6, 122.5] },
+  { nome:'ILICÍNEA', fretes:[0,0,0,0,0], precos:[126.2, 123.8, 125.1, 125.7, 126.7] },
+  { nome:'ITUTINGA', fretes:[0,0,0,0,0], precos:[123.2, 121.1, 123.0, 123.9, 124.9] },
+  { nome:'LAGOA DOURADA', fretes:[0,0,0,0,0], precos:[123.2, 121.1, 122.1, 123.3, 124.3] },
+  { nome:'LAVRAS', fretes:[0,0,0,0,0], precos:[124.1, 122.3, 123.3, 123.9, 124.9] },
+  { nome:'LUMINÁRIAS', fretes:[0,0,0,0,0], precos:[125.0, 122.9, 123.9, 124.5, 125.5] },
+  { nome:'MADRE DE DEUS', fretes:[0,0,0,0,0], precos:[124.4, 121.7, 122.1, 122.7, 124.9] },
+  { nome:'MARTINHO CAMPOS / POMPÉU', fretes:[0,0,0,0,0], precos:[123.2, 120.8, 121.8, 122.7, 124.3] },
+  { nome:'MORADA NOVA DE MINAS', fretes:[0,0,0,0,0], precos:[119.6, 116.9, 117.9, 119.1, 120.1] },
+  { nome:'NAZARENO', fretes:[0,0,0,0,0], precos:[124.4, 121.1, 122.7, 122.7, 124.9] },
+  { nome:'PARAGUAÇU', fretes:[0,0,0,0,0], precos:[127.4, 125.0, 126.0, 126.9, 127.9] },
+  { nome:'PASSOS', fretes:[0,0,0,0,0], precos:[124.7, 122.3, 123.3, 124.2, 125.2] },
+  { nome:'PIUMHI', fretes:[0,0,0,0,0], precos:[123.8, 121.4, 122.4, 122.7, 124.3] },
+  { nome:'POUSO ALEGRE', fretes:[0,0,0,0,0], precos:[127.4, 125.3, 126.3, 126.9, 128.2] },
+  { nome:'PRATÁPOLIS', fretes:[0,0,0,0,0], precos:[125.0, 122.6, 123.6, 124.5, 125.5] },
+  { nome:'REGIÃO CRC / ALPINÓPOLIS', fretes:[0,0,0,0,0], precos:[125.3, 122.9, 123.9, 124.8, 125.8] },
+  { nome:'REGIÃO S. J.  DEL REI / PRADOS-', fretes:[0,0,0,0,0], precos:[124.4, 121.1, 122.7, 122.7, 124.9] },
+  { nome:'SÃO BENTO ABADE', fretes:[0,0,0,0,0], precos:[125.9, 123.8, 125.4, 125.4, 126.7] },
+  { nome:'SÃO GONÇALO DO SAPUCAÍ', fretes:[0,0,0,0,0], precos:[128.0, 125.6, 126.9, 127.5, 128.5] },
+  { nome:'SÃO JOSÉ DA BARRA', fretes:[0,0,0,0,0], precos:[123.8, 121.7, 122.7, 123.3, 124.9] },
+  { nome:'SÃO VICENTE DE MINAS', fretes:[0,0,0,0,0], precos:[125.0, 122.9, 123.9, 125.1, 126.1] },
+  { nome:'TRÊS CORAÇÕES', fretes:[0,0,0,0,0], precos:[127.1, 125.0, 126.0, 126.6, 127.9] },
+  { nome:'TRÊS PONTAS', fretes:[0,0,0,0,0], precos:[126.5, 124.4, 125.7, 126.3, 127.6] },
 ];
 
 // =================== LOGO ===================
@@ -1548,51 +1549,50 @@ function lerPlanilha(input) {
       const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
 
       const mapaCidades = buildMapaCidades();
-      const MESES_PLAN = ['fevereiro','março','marco','abril','maio','junho'];
-      const MESES_IDX  = { 'fevereiro':0,'março':1,'marco':1,'abril':2,'maio':3,'junho':4 };
+      const MESES_ORDER = ['fevereiro','março','abril','maio','junho'];
+      const MESES_IDX   = {'fevereiro':0,'março':1,'marco':1,'abril':2,'maio':3,'junho':4};
+      // 4 blocos por grupo de linhas: (col_nome, col_preco)
+      const BLOCOS = [[0,1],[4,5],[8,9],[13,14]];
 
       let atualizados = 0;
-      let cidadeAtual = null;
 
-      rows.forEach(row => {
-        // Detecta cabeçalho de cidade — célula que contém "REGIÃO DE" ou nome de cidade
-        const cel0 = String(row[0]||'').trim();
-        const cel1 = String(row[1]||'').trim();
+      rows.forEach((row, ri) => {
+        BLOCOS.forEach(([colNome, colPreco]) => {
+          const cel = String(row[colNome] || '').trim().toUpperCase();
+          // Linha de cabeçalho de cidade
+          if(cel.includes('SOJA') || (cel.includes('REGIÃO') && cel.length > 5) || cel.includes('CRC') || cel.includes('CIF')) {
+            // Busca preços nas próximas linhas deste bloco
+            for(let offset = 1; offset <= 10; offset++) {
+              const r2 = rows[ri + offset];
+              if(!r2) break;
+              const mesCel = String(r2[colNome] || '').toLowerCase().trim();
+              const mesIdx = MESES_IDX[mesCel];
+              if(mesIdx === undefined) continue;
+              const val = parseFloat(String(r2[colPreco] || '').replace(',','.'));
+              if(isNaN(val) || val < 50) continue;
 
-        // Linha de título da região
-        if(cel0.toUpperCase().includes('REGIÃO') || cel0.toUpperCase().includes('REGIAO') || cel0.toUpperCase().includes('CIF')) {
-          // Extrai nome: "REGIÃO DE ALFENAS - SOJA..." → "ALFENAS"
-          const match = cel0.match(/(?:REGIÃO\s+(?:DE\s+|S\.\s*J\.\s*|CRC\s*\/\s*)?|REGIAO\s+DE\s+|CIF\s+)(.+?)(?:\s*[-–]|\s*\/\s*SOJA|\s*$)/i);
-          if(match) {
-            const nomePlan = normalizarNome(match[1].trim());
-            cidadeAtual = mapaCidades[nomePlan] !== undefined ? mapaCidades[nomePlan] : null;
-            // tenta match parcial se não achou direto
-            if(cidadeAtual === null) {
-              for(const [k,v] of Object.entries(mapaCidades)) {
-                if(nomePlan.startsWith(k) || k.startsWith(nomePlan.split(' ')[0])) {
-                  cidadeAtual = v; break;
+              // Normaliza nome da cidade para encontrar o índice em DADOS_CIDADES
+              let nomeLimpo = cel
+                .replace(/E REGIÃO.*/i,'').replace(/SOJA.*/i,'').replace(/2026.*/i,'')
+                .replace(/ - .*/,'').replace(/REGIÃO\s+(DE\s+|CRC\s*\/\s*)?/i,'')
+                .trim().replace(/[-/]+$/,'').trim();
+              const nomeNorm = normalizarNome(nomeLimpo);
+              let cidadeIdx = mapaCidades[nomeNorm];
+              if(cidadeIdx === undefined) {
+                // Busca parcial
+                for(const [k,v] of Object.entries(mapaCidades)) {
+                  if(nomeNorm.startsWith(k) || k.startsWith(nomeNorm.split(' ')[0])) {
+                    cidadeIdx = v; break;
+                  }
                 }
+              }
+              if(cidadeIdx !== undefined) {
+                state.precosEditados[cidadeIdx + '-' + mesIdx] = val;
+                atualizados++;
               }
             }
           }
-          return;
-        }
-
-        if(cidadeAtual === null) return;
-
-        // Linha de mês: primeira coluna é o mês
-        const mesBruto = cel0.toLowerCase().trim();
-        const mesIdx = MESES_IDX[mesBruto];
-        if(mesIdx === undefined) return;
-
-        // Coluna BRUTO é a 3ª (índice 2) — corresponde ao preço bruto
-        // Layout: [MÊS, LIVRE, BRUTO, PAGAMENTO]
-        const bruto = parseFloat(String(row[2]||'').replace(',','.'));
-        if(!isNaN(bruto) && bruto > 50) { // filtro sanidade
-          const key = cidadeAtual + '-' + mesIdx;
-          state.precosEditados[key] = bruto;
-          atualizados++;
-        }
+        });
       });
 
       if(atualizados === 0) throw new Error('Nenhum preço reconhecido. Verifique o formato da planilha.');
