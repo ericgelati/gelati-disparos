@@ -394,16 +394,20 @@
     <!-- CONFIG API -->
     <div class="tab-view" id="tab-config">
       <div class="card">
-        <div class="card-title">🔌 Z-API — Configuração</div>
+        <div class="card-title">🔌 Evolution API — Configuração</div>
         <div class="api-status"><div class="api-dot" id="api-dot"></div><span id="api-status-text">Aguardando configuração</span></div>
         <div class="form-grid">
           <div class="form-group full">
-            <label>Instance ID</label>
-            <input type="text" id="api-instance" placeholder="Ex: 3DF731C2E036C8187AD22F5DC1..." />
+            <label>URL da Evolution API</label>
+            <input type="text" id="api-instance" placeholder="http://187.127.33.158:8080" value="http://187.127.33.158:8080" />
           </div>
-          <div class="form-group full">
-            <label>Token</label>
-            <input type="password" id="api-key" placeholder="••••••••••••••••••••••••••" />
+          <div class="form-group">
+            <label>API Key</label>
+            <input type="password" id="api-key" placeholder="gelati2026" />
+          </div>
+          <div class="form-group">
+            <label>Nome da Instância</label>
+            <input type="text" id="api-instance-name" placeholder="gelati-soja" value="gelati-soja" />
           </div>
           <div class="form-group full">
             <label>Número de Teste — com DDI (sem + ou espaços)</label>
@@ -413,17 +417,16 @@
         <div class="btn-row">
           <button class="btn btn-primary" onclick="salvarAPI()">💾 Salvar</button>
           <button class="btn btn-gold" onclick="testarConexao()">🔗 Testar Conexão</button>
-          <button class="btn btn-secondary" onclick="abrirQRCode()">📱 Abrir Painel Z-API</button>
+          <button class="btn btn-secondary" onclick="abrirQRCode()">📱 QR Code</button>
         </div>
       </div>
       <div class="card">
-        <div class="card-title">ℹ️ Como configurar Z-API</div>
+        <div class="card-title">ℹ️ Configuração atual</div>
         <div style="font-size:12px;line-height:1.9;color:var(--cinza-4)">
-          <p><strong>1.</strong> Acesse <a href="https://app.z-api.io" target="_blank" style="color:var(--verde)">app.z-api.io</a> e faça login.</p>
-          <p><strong>2.</strong> Clique na sua instância e copie o <strong>Instance ID</strong> e o <strong>Token</strong>.</p>
-          <p><strong>3.</strong> Cole os dados acima e clique em <strong>💾 Salvar</strong>.</p>
-          <p><strong>4.</strong> Clique em <strong>📱 Abrir Painel Z-API</strong> → acesse sua instância → clique em <strong>Conectar</strong> → escaneie o QR Code com o WhatsApp.</p>
-          <p><strong>5.</strong> Volte aqui e clique em <strong>🔗 Testar Conexão</strong> — o badge no topo deve ficar 🟢 verde.</p>
+          <p><strong>Servidor:</strong> Hostinger VPS — 187.127.33.158</p>
+          <p><strong>Instância:</strong> gelati-soja</p>
+          <p><strong>Status:</strong> Evolution API v1.8.2 rodando via Docker</p>
+          <p style="margin-top:6px">Para reconectar o WhatsApp clique em <strong>📱 QR Code</strong>.</p>
         </div>
       </div>
     </div>
@@ -1084,11 +1087,129 @@ function dispararAgora(){
   },intervalo*(i+1)));
 }
 
-// =================== Z-API ===================
-function zApiUrl(endpoint) {
-  const { instance, key } = state.apiConfig;
-  return `https://api.z-api.io/instances/${instance}/token/${key}/${endpoint}`;
+// =================== EVOLUTION API ===================
+function evolutionUrl(endpoint) {
+  const { url, instance } = state.apiConfig;
+  return `${url}/${endpoint}/${instance}`;
 }
+
+async function salvarAPI() {
+  const url      = document.getElementById('api-instance').value.trim(); // reusando campo como URL
+  const key      = document.getElementById('api-key').value.trim();
+  const instance = document.getElementById('api-instance-name')?.value.trim() || 'gelati-soja';
+  const testNumber = document.getElementById('api-test-number').value.trim();
+  if(!url || !key) { toast('Preencha URL e API Key','warn'); return; }
+  state.apiConfig = { url, key, instance, testNumber };
+  document.getElementById('api-dot').className = 'api-dot';
+  document.getElementById('api-status-text').textContent = 'Configurado — testando conexão...';
+  toast('Dados salvos. Testando conexão...', 'success');
+  await testarConexao();
+}
+
+async function testarConexao() {
+  if(!state.apiConfig.url || !state.apiConfig.key) {
+    toast('Configure URL e API Key primeiro','warn'); return;
+  }
+  try {
+    const res  = await fetch(`${state.apiConfig.url}/instance/fetchInstances`, {
+      headers: { 'apikey': state.apiConfig.key }
+    });
+    const data = await res.json();
+    console.log('Evolution API status:', data);
+    const inst = Array.isArray(data) ? data.find(i => i.instance?.instanceName === state.apiConfig.instance) : null;
+    const conectado = inst?.instance?.status === 'open';
+    state.conectado = conectado;
+    document.getElementById('conn-dot').className = 'dot ' + (conectado ? '' : 'off');
+    document.getElementById('conn-text').textContent = conectado ? 'Conectado' : 'Desconectado';
+    document.getElementById('api-dot').className = 'api-dot connected';
+    document.getElementById('api-status-text').textContent = conectado
+      ? '✅ WhatsApp conectado e pronto para disparar'
+      : '⚠️ API configurada — WhatsApp não conectado.';
+    toast(conectado ? 'WhatsApp conectado ✓' : 'API ok, mas WhatsApp desconectado', conectado ? 'success' : 'warn');
+  } catch(e) {
+    console.error('Evolution API erro:', e);
+    document.getElementById('api-status-text').textContent = '✗ Erro — verifique URL e API Key';
+    toast('Erro ao conectar: ' + e.message, 'error');
+  }
+}
+
+function abrirQRCode() {
+  if(!state.apiConfig.url) { toast('Salve os dados da API primeiro','warn'); return; }
+  const qrUrl = `${state.apiConfig.url}/instance/connect/${state.apiConfig.instance}`;
+  window.open(qrUrl, '_blank');
+  toast('Abrindo QR Code da Evolution API...','warn');
+}
+
+function toggleConexao() {
+  if(!state.apiConfig.url) { switchTab('config'); toast('Configure a API primeiro','warn'); return; }
+  testarConexao();
+}
+
+async function enviarImagemEvolution(numero, imagemBase64, legenda) {
+  const body = {
+    number: numero,
+    mediatype: 'image',
+    mimetype: 'image/png',
+    caption: legenda || '',
+    media: imagemBase64,
+    fileName: 'precos_soja.png'
+  };
+  const res = await fetch(`${state.apiConfig.url}/message/sendMedia/${state.apiConfig.instance}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': state.apiConfig.key
+    },
+    body: JSON.stringify(body)
+  });
+  const data = await res.json();
+  if(!res.ok || data.error) throw new Error(data.message || data.error || `HTTP ${res.status}`);
+  return data;
+}
+
+async function testarMensagem() {
+  const num = state.apiConfig.testNumber;
+  if(!num) { switchTab('config'); toast('Informe o número de teste','warn'); return; }
+  if(!state.canvasAtual) { toast('Gere a tabela primeiro selecionando cidades','warn'); return; }
+  toast('Enviando imagem de teste...', 'warn');
+  try {
+    await enviarImagemEvolution(num, state.canvasAtual, 'Teste — E. F. Gelati Preços Soja 2026/27');
+    state.historico.unshift({dt:dataHoraAgora(), dest:'Teste', tipo:'Teste', status:'ok'});
+    renderHistorico();
+    toast('✓ Imagem de teste enviada com sucesso!', 'success');
+  } catch(e) {
+    state.historico.unshift({dt:dataHoraAgora(), dest:'Teste', tipo:'Teste', status:'fail'});
+    renderHistorico();
+    toast('Erro no envio: ' + e.message, 'error');
+  }
+}
+
+async function dispararModeloAtivo() {
+  if(!state.conectado)   { toast('Conecte o WhatsApp primeiro','warn'); return; }
+  if(!state.modeloAtivo) { toast('Selecione um modelo','warn'); return; }
+  if(!state.canvasAtual) { toast('Aguarde a imagem gerar','warn'); return; }
+  const m   = state.modeloAtivo;
+  const sel = state.contatos.filter(c => m.contatoIds.includes(c.id));
+  if(!sel.length) { toast('Nenhum contato no modelo','warn'); return; }
+  const intervalo = parseInt(document.getElementById('sel-intervalo').value);
+  const legenda   = document.getElementById('img-legenda')?.value || 'E. F. Gelati — Preços Soja 2026/27';
+  toast(`Disparando "${m.nome}" para ${sel.length} contato${sel.length!==1?'s':''}...`, 'success');
+  for(let i = 0; i < sel.length; i++) {
+    const c = sel[i];
+    if(i > 0) await new Promise(r => setTimeout(r, intervalo));
+    try {
+      await enviarImagemEvolution(c.fone, state.canvasAtual, legenda);
+      state.historico.unshift({dt:dataHoraAgora(), dest:c.nome, tipo:m.nome, status:'ok'});
+    } catch(e) {
+      state.historico.unshift({dt:dataHoraAgora(), dest:c.nome, tipo:m.nome, status:'fail'});
+      toast(`Falha ao enviar para ${c.nome}: ${e.message}`, 'error');
+    }
+    renderHistorico();
+  }
+  toast('Disparos concluídos ✓', 'success');
+}
+
+function mostrarQR() { abrirQRCode(); }
 
 async function salvarAPI() {
   const instance = document.getElementById('api-instance').value.trim();
@@ -1140,7 +1261,7 @@ function toggleConexao() {
   testarConexao();
 }
 
-async function enviarImagemZApi(numero, imagemBase64, legenda) {
+async function enviarImagemEvolution(numero, imagemBase64, legenda) {
   // Z-API: image deve ser o data URI completo (data:image/png;base64,...)
   const body = {
     phone: numero,
@@ -1163,7 +1284,7 @@ async function testarMensagem() {
   if(!state.canvasAtual) { toast('Gere a tabela primeiro selecionando cidades','warn'); return; }
   toast('Enviando imagem de teste...', 'warn');
   try {
-    await enviarImagemZApi(num, state.canvasAtual, 'Teste — E. F. Gelati Preços Soja 2026/27');
+    await enviarImagemEvolution(num, state.canvasAtual, 'Teste — E. F. Gelati Preços Soja 2026/27');
     state.historico.unshift({dt:dataHoraAgora(), dest:'Teste', tipo:'Teste', status:'ok'});
     renderHistorico();
     toast('✓ Imagem de teste enviada com sucesso!', 'success');
@@ -1189,7 +1310,7 @@ async function dispararModeloAtivo() {
     const c = sel[i];
     await new Promise(r => setTimeout(r, i === 0 ? 0 : intervalo));
     try {
-      await enviarImagemZApi(c.fone, state.canvasAtual, legenda);
+      await enviarImagemEvolution(c.fone, state.canvasAtual, legenda);
       state.historico.unshift({dt:dataHoraAgora(), dest:c.nome, tipo:m.nome, status:'ok'});
     } catch(e) {
       state.historico.unshift({dt:dataHoraAgora(), dest:c.nome, tipo:m.nome, status:'fail'});
@@ -1804,7 +1925,7 @@ async function verificarAgendamentos() {
         const c = contatos[i];
         if(i > 0) await new Promise(r => setTimeout(r, intervalo));
         try {
-          await enviarImagemZApi(c.fone, state.canvasAtual, legenda);
+          await enviarImagemEvolution(c.fone, state.canvasAtual, legenda);
           state.historico.unshift({dt:dataHoraAgora(), dest:c.nome, tipo:`⏰ ${ag.nome}`, status:'ok'});
         } catch(e) {
           state.historico.unshift({dt:dataHoraAgora(), dest:c.nome, tipo:`⏰ ${ag.nome}`, status:'fail'});
