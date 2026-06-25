@@ -1228,7 +1228,7 @@ async function testarConexao() {
     toast('Configure Instance ID e Token primeiro','warn'); return;
   }
   try {
-    const res  = await fetch(zApiUrl('status'), { method:'GET' });
+    const res  = await fetch(`${state.apiConfig.url}/instance/fetchInstances`, { method:'GET' });
     const data = await res.json();
     console.log('Z-API status:', data); // debug
     const conectado = data?.connected === true && data?.smartphoneConnected === true;
@@ -1268,7 +1268,7 @@ async function enviarImagemEvolution(numero, imagemBase64, legenda) {
     image: imagemBase64, // já vem com prefixo data:image/png;base64, do canvas.toDataURL()
     caption: legenda || ''
   };
-  const res = await fetch(zApiUrl('send-image'), {
+  const res = await fetch(`${state.apiConfig.url}/message/sendMedia/${state.apiConfig.instance}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' }, // Z-API não usa header de auth extra
     body: JSON.stringify(body)
