@@ -1094,9 +1094,9 @@ function evolutionUrl(endpoint) {
 }
 
 async function salvarAPI() {
-  const url      = document.getElementById('api-instance').value.trim(); // reusando campo como URL
-  const key      = document.getElementById('api-key').value.trim();
-  const instance = document.getElementById('api-instance-name')?.value.trim() || 'gelati-soja';
+  const url        = document.getElementById('api-instance').value.trim();
+  const key        = document.getElementById('api-key').value.trim();
+  const instance   = document.getElementById('api-instance-name')?.value.trim() || 'gelati-soja';
   const testNumber = document.getElementById('api-test-number').value.trim();
   if(!url || !key) { toast('Preencha URL e API Key','warn'); return; }
   state.apiConfig = { url, key, instance, testNumber };
@@ -1210,56 +1210,6 @@ async function dispararModeloAtivo() {
 }
 
 function mostrarQR() { abrirQRCode(); }
-
-async function salvarAPI() {
-  const instance = document.getElementById('api-instance').value.trim();
-  const key      = document.getElementById('api-key').value.trim();
-  const testNumber = document.getElementById('api-test-number').value.trim();
-  if(!instance || !key) { toast('Preencha Instance ID e Token','warn'); return; }
-  state.apiConfig = { instance, key, testNumber };
-  document.getElementById('api-dot').className = 'api-dot';
-  document.getElementById('api-status-text').textContent = 'Configurado — testando conexão...';
-  toast('Dados salvos. Testando conexão...', 'success');
-  await testarConexao();
-}
-
-async function testarConexao() {
-  if(!state.apiConfig.instance || !state.apiConfig.key) {
-    toast('Configure Instance ID e Token primeiro','warn'); return;
-  }
-  try {
-    const res  = await fetch(`${state.apiConfig.url}/instance/fetchInstances`, { method:'GET' });
-    const data = await res.json();
-    console.log('Z-API status:', data); // debug
-    const conectado = data?.connected === true && data?.smartphoneConnected === true;
-    state.conectado = conectado;
-    document.getElementById('conn-dot').className = 'dot ' + (conectado ? '' : 'off');
-    document.getElementById('conn-text').textContent = conectado ? 'Conectado' : 'Desconectado';
-    document.getElementById('api-dot').className = 'api-dot connected';
-    document.getElementById('api-status-text').textContent = conectado
-      ? '✅ WhatsApp conectado e pronto para disparar'
-      : '⚠️ API configurada — WhatsApp não conectado. Escaneie o QR Code.';
-    toast(conectado ? 'WhatsApp conectado ✓' : 'WhatsApp desconectado — escaneie o QR', conectado ? 'success' : 'warn');
-  } catch(e) {
-    console.error('Z-API erro:', e);
-    document.getElementById('api-status-text').textContent = '✗ Erro — verifique Instance ID e Token';
-    toast('Erro ao conectar: ' + e.message, 'error');
-  }
-}
-
-function abrirQRCode() {
-  if(!state.apiConfig.instance || !state.apiConfig.key) {
-    toast('Salve os dados da API primeiro','warn'); return;
-  }
-  // Abre o painel da Z-API onde o QR Code fica disponível
-  window.open('https://app.z-api.io', '_blank');
-  toast('Acesse sua instância no painel Z-API e clique em "Conectar" para escanear o QR Code','warn');
-}
-
-function toggleConexao() {
-  if(!state.apiConfig.instance) { switchTab('config'); toast('Configure a API primeiro','warn'); return; }
-  testarConexao();
-}
 
 async function enviarImagemEvolution(numero, imagemBase64, legenda) {
   // Z-API: image deve ser o data URI completo (data:image/png;base64,...)
