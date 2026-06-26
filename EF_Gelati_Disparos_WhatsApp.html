@@ -1148,11 +1148,13 @@ function toggleConexao() {
 async function enviarImagemEvolution(numero, imagemBase64, legenda) {
   const body = {
     number: numero,
-    mediatype: 'image',
-    mimetype: 'image/png',
-    caption: legenda || '',
-    media: imagemBase64,
-    fileName: 'precos_soja.png'
+    mediaMessage: {
+      mediatype: 'image',
+      mimetype: 'image/png',
+      caption: legenda || '',
+      media: imagemBase64,
+      fileName: 'precos_soja.png'
+    }
   };
   const res = await fetch(`${state.apiConfig.url}/message/sendMedia/${state.apiConfig.instance}`, {
     method: 'POST',
@@ -1163,7 +1165,7 @@ async function enviarImagemEvolution(numero, imagemBase64, legenda) {
     body: JSON.stringify(body)
   });
   const data = await res.json();
-  if(!res.ok || data.error) throw new Error(data.message || data.error || `HTTP ${res.status}`);
+  if(!res.ok || data.error) throw new Error(data.message || JSON.stringify(data) || `HTTP ${res.status}`);
   return data;
 }
 
