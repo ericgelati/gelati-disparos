@@ -399,11 +399,11 @@
         <div class="form-grid">
           <div class="form-group full">
             <label>URL da Evolution API</label>
-            <input type="text" id="api-instance" placeholder="http://187.127.33.158:8080" value="http://187.127.33.158:8080" />
+            <input type="text" id="api-instance" placeholder="https://api.efgelati.cloud" value="https://api.efgelati.cloud" />
           </div>
           <div class="form-group">
             <label>API Key</label>
-            <input type="password" id="api-key" placeholder="gelati2026" />
+            <input type="password" id="api-key" placeholder="API Key global do servidor" />
           </div>
           <div class="form-group">
             <label>Nome da Instância</label>
@@ -423,9 +423,9 @@
       <div class="card">
         <div class="card-title">ℹ️ Configuração atual</div>
         <div style="font-size:12px;line-height:1.9;color:var(--cinza-4)">
-          <p><strong>Servidor:</strong> Hostinger VPS — 187.127.33.158</p>
+          <p><strong>Servidor:</strong> Hostinger VPS KVM 2 — https://api.efgelati.cloud</p>
           <p><strong>Instância:</strong> gelati-soja</p>
-          <p><strong>Status:</strong> Evolution API v1.8.2 rodando via Docker</p>
+          <p><strong>Status:</strong> Evolution API v2.3.7 (Docker, HTTPS fixo)</p>
           <p style="margin-top:6px">Para reconectar o WhatsApp clique em <strong>📱 QR Code</strong>.</p>
         </div>
       </div>
@@ -1072,19 +1072,27 @@ function removerAgendamento(id){state.agendamentos=state.agendamentos.filter(a=>
 function removerContato(id){state.contatos=state.contatos.filter(c=>c.id!==id);state.contatosSel.delete(id);renderContactList('contact-list-manual',true);renderContactList('contact-list-full',false);toast('Contato removido');}
 function editarContato(id){const c=state.contatos.find(x=>x.id===id);if(!c)return;document.getElementById('ct-nome').value=c.nome;document.getElementById('ct-fone').value=c.fone;document.getElementById('ct-grupo').value=c.grupo;document.getElementById('modal-contato').dataset.editId=id;document.getElementById('modal-contato').classList.add('open');}
 
-function dispararAgora(){
+async function dispararAgora(){
   if(!state.conectado){toast('Conecte o WhatsApp primeiro','warn');return;}
   const sel=state.contatos.filter(c=>state.contatosSel.has(c.id));
   if(!sel.length){toast('Selecione ao menos um contato','warn');return;}
   if(!state.canvasAtual){toast('Gere a tabela primeiro','warn');return;}
   const intervalo=parseInt(document.getElementById('sel-intervalo').value);
+  const legenda=document.getElementById('img-legenda')?.value || 'E. F. GELATI — Preços Soja 2026/27';
   toast(`Disparando imagem para ${sel.length} contatos...`,'success');
-  // Na integração real com Evolution API, state.canvasAtual (base64 PNG)
-  // é enviado via endpoint /message/sendMedia com mediatype "image"
-  sel.forEach((c,i)=>setTimeout(()=>{
-    state.historico.unshift({dt:dataHoraAgora(),dest:c.nome,tipo:'Imagem PNG',status:'ok'});
-    if(i===sel.length-1){renderHistorico();toast('Disparos concluídos ✓','success');}
-  },intervalo*(i+1)));
+  for(let i=0;i<sel.length;i++){
+    const c=sel[i];
+    if(i>0) await new Promise(r=>setTimeout(r,intervalo));
+    try{
+      await enviarImagemEvolution(c.fone,state.canvasAtual,legenda);
+      state.historico.unshift({dt:dataHoraAgora(),dest:c.nome,tipo:'Imagem PNG',status:'ok'});
+    }catch(e){
+      state.historico.unshift({dt:dataHoraAgora(),dest:c.nome,tipo:'Imagem PNG',status:'fail'});
+      toast(`Falha ao enviar para ${c.nome}: ${e.message}`,'error');
+    }
+    renderHistorico();
+  }
+  toast('Disparos concluídos ✓','success');
 }
 
 // =================== EVOLUTION API ===================
@@ -1094,12 +1102,13 @@ function evolutionUrl(endpoint) {
 }
 
 async function salvarAPI() {
-  const url        = document.getElementById('api-instance').value.trim();
+  const url        = document.getElementById('api-instance').value.trim().replace(/\/+$/,'');
   const key        = document.getElementById('api-key').value.trim();
   const instance   = document.getElementById('api-instance-name')?.value.trim() || 'gelati-soja';
   const testNumber = document.getElementById('api-test-number').value.trim();
   if(!url || !key) { toast('Preencha URL e API Key','warn'); return; }
   state.apiConfig = { url, key, instance, testNumber };
+  try { localStorage.setItem('gelati_api_config', JSON.stringify(state.apiConfig)); } catch(e) {}
   document.getElementById('api-dot').className = 'api-dot';
   document.getElementById('api-status-text').textContent = 'Configurado — testando conexão...';
   toast('Dados salvos. Testando conexão...', 'success');
@@ -1116,15 +1125,17 @@ async function testarConexao() {
     });
     const data = await res.json();
     console.log('Evolution API status:', data);
-    const inst = Array.isArray(data) ? data.find(i => i.instance?.instanceName === state.apiConfig.instance) : null;
-    const conectado = inst?.instance?.status === 'open';
+    if(!res.ok) throw new Error(data?.response?.message || data?.message || `HTTP ${res.status}`);
+    const lista = Array.isArray(data) ? data : [];
+    const inst = lista.find(i => (i.name || i.instance?.instanceName) === state.apiConfig.instance);
+    const conectado = (inst?.connectionStatus || inst?.instance?.status) === 'open';
     state.conectado = conectado;
     document.getElementById('conn-dot').className = 'dot ' + (conectado ? '' : 'off');
     document.getElementById('conn-text').textContent = conectado ? 'Conectado' : 'Desconectado';
     document.getElementById('api-dot').className = 'api-dot connected';
     document.getElementById('api-status-text').textContent = conectado
       ? '✅ WhatsApp conectado e pronto para disparar'
-      : '⚠️ API configurada — WhatsApp não conectado.';
+      : (inst ? '⚠️ API configurada — WhatsApp não conectado. Use 📱 QR Code.' : `⚠️ Instância "${state.apiConfig.instance}" não existe no servidor.`);
     toast(conectado ? 'WhatsApp conectado ✓' : 'API ok, mas WhatsApp desconectado', conectado ? 'success' : 'warn');
   } catch(e) {
     console.error('Evolution API erro:', e);
@@ -1135,9 +1146,8 @@ async function testarConexao() {
 
 function abrirQRCode() {
   if(!state.apiConfig.url) { toast('Salve os dados da API primeiro','warn'); return; }
-  const qrUrl = `${state.apiConfig.url}/instance/connect/${state.apiConfig.instance}`;
-  window.open(qrUrl, '_blank');
-  toast('Abrindo QR Code da Evolution API...','warn');
+  window.open(`${state.apiConfig.url}/manager`, '_blank');
+  toast(`Abrindo o painel — entre na instância "${state.apiConfig.instance}" e gere o QR Code`,'warn');
 }
 
 function toggleConexao() {
@@ -1146,15 +1156,15 @@ function toggleConexao() {
 }
 
 async function enviarImagemEvolution(numero, imagemBase64, legenda) {
+  // Evolution API v2: campos no nível raiz; base64 sem o prefixo data:
+  const media = String(imagemBase64 || '').replace(/^data:[^;]+;base64,/, '');
   const body = {
-    number: numero,
-    mediaMessage: {
-      mediatype: 'image',
-      mimetype: 'image/png',
-      caption: legenda || '',
-      media: imagemBase64,
-      fileName: 'precos_soja.png'
-    }
+    number: String(numero).replace(/\D/g, ''),
+    mediatype: 'image',
+    mimetype: 'image/png',
+    caption: legenda || '',
+    media,
+    fileName: 'precos_soja.png'
   };
   const res = await fetch(`${state.apiConfig.url}/message/sendMedia/${state.apiConfig.instance}`, {
     method: 'POST',
@@ -1164,8 +1174,8 @@ async function enviarImagemEvolution(numero, imagemBase64, legenda) {
     },
     body: JSON.stringify(body)
   });
-  const data = await res.json();
-  if(!res.ok || data.error) throw new Error(data.message || JSON.stringify(data) || `HTTP ${res.status}`);
+  const data = await res.json().catch(() => ({}));
+  if(!res.ok || data.error) throw new Error(JSON.stringify(data?.response?.message || data.message || data) || `HTTP ${res.status}`);
   return data;
 }
 
@@ -1213,67 +1223,6 @@ async function dispararModeloAtivo() {
 
 function mostrarQR() { abrirQRCode(); }
 
-async function enviarImagemEvolution(numero, imagemBase64, legenda) {
-  // Z-API: image deve ser o data URI completo (data:image/png;base64,...)
-  const body = {
-    phone: numero,
-    image: imagemBase64, // já vem com prefixo data:image/png;base64, do canvas.toDataURL()
-    caption: legenda || ''
-  };
-  const res = await fetch(`${state.apiConfig.url}/message/sendMedia/${state.apiConfig.instance}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' }, // Z-API não usa header de auth extra
-    body: JSON.stringify(body)
-  });
-  const data = await res.json();
-  if(!res.ok || data.error) throw new Error(data.message || data.error || `HTTP ${res.status}`);
-  return data;
-}
-
-async function testarMensagem() {
-  const num = state.apiConfig.testNumber;
-  if(!num) { switchTab('config'); toast('Informe o número de teste','warn'); return; }
-  if(!state.canvasAtual) { toast('Gere a tabela primeiro selecionando cidades','warn'); return; }
-  toast('Enviando imagem de teste...', 'warn');
-  try {
-    await enviarImagemEvolution(num, state.canvasAtual, 'Teste — E. F. Gelati Preços Soja 2026/27');
-    state.historico.unshift({dt:dataHoraAgora(), dest:'Teste', tipo:'Teste', status:'ok'});
-    renderHistorico();
-    toast('✓ Imagem de teste enviada com sucesso!', 'success');
-  } catch(e) {
-    state.historico.unshift({dt:dataHoraAgora(), dest:'Teste', tipo:'Teste', status:'fail'});
-    renderHistorico();
-    toast('Erro no envio: ' + e.message, 'error');
-  }
-}
-
-async function dispararModeloAtivo() {
-  if(!state.conectado)   { toast('Conecte o WhatsApp primeiro','warn'); return; }
-  if(!state.modeloAtivo) { toast('Selecione um modelo','warn'); return; }
-  if(!state.canvasAtual) { toast('Aguarde a imagem gerar','warn'); return; }
-  const m   = state.modeloAtivo;
-  const sel = state.contatos.filter(c => m.contatoIds.includes(c.id));
-  if(!sel.length) { toast('Nenhum contato no modelo','warn'); return; }
-  const intervalo = parseInt(document.getElementById('sel-intervalo').value);
-  const legenda   = document.getElementById('img-legenda')?.value || 'E. F. Gelati — Preços Soja 2026/27';
-  toast(`Disparando "${m.nome}" para ${sel.length} contato${sel.length!==1?'s':''}...`, 'success');
-
-  for(let i = 0; i < sel.length; i++) {
-    const c = sel[i];
-    await new Promise(r => setTimeout(r, i === 0 ? 0 : intervalo));
-    try {
-      await enviarImagemEvolution(c.fone, state.canvasAtual, legenda);
-      state.historico.unshift({dt:dataHoraAgora(), dest:c.nome, tipo:m.nome, status:'ok'});
-    } catch(e) {
-      state.historico.unshift({dt:dataHoraAgora(), dest:c.nome, tipo:m.nome, status:'fail'});
-      toast(`Falha ao enviar para ${c.nome}: ${e.message}`, 'error');
-    }
-    renderHistorico();
-  }
-  toast('Disparos concluídos ✓', 'success');
-}
-
-function mostrarQR() { abrirQRCode(); }
 
 function salvarAgendamento(){
   const nome = document.getElementById('sch-nome').value.trim();
@@ -1893,6 +1842,19 @@ async function verificarAgendamentos() {
 window.addEventListener('DOMContentLoaded',()=>{
   _carregarLogo(); // pré-carrega logo imediatamente
   renderTudo();
+
+  // Restaura a configuração da API salva neste navegador e testa a conexão
+  try {
+    const cfg = JSON.parse(localStorage.getItem('gelati_api_config') || 'null');
+    if(cfg && cfg.url && cfg.key) {
+      state.apiConfig = cfg;
+      document.getElementById('api-instance').value = cfg.url;
+      document.getElementById('api-key').value = cfg.key;
+      if(document.getElementById('api-instance-name')) document.getElementById('api-instance-name').value = cfg.instance || 'gelati-soja';
+      document.getElementById('api-test-number').value = cfg.testNumber || '';
+      testarConexao();
+    }
+  } catch(e) {}
   setInterval(gerarTabelaImagem, 60000);
 
   // Verifica agendamentos a cada minuto
