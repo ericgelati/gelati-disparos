@@ -252,6 +252,7 @@
       </div>
       <input type="file" id="input-xlsx" accept=".xlsx,.xls" style="display:none" onchange="lerPlanilha(this)" />
       <div id="upload-status" style="display:none;margin-top:6px;padding:7px 10px;border-radius:6px;font-size:11px"></div>
+      <div id="fonte-precos" style="margin-top:6px;font-size:10px;line-height:1.5;color:var(--cinza-4)"></div>
     </div>
 
     <!-- MÊS -->
@@ -640,6 +641,8 @@ const state = {
   canvasAtual: null,
   versaoCidades: VERSAO_CIDADES,
   planilhaCsvUrl: '',
+  precosManualAte: 0,   // upload manual tem prioridade sobre o Sheets até o fim do dia
+  precosFonte: '',
 };
 
 // Nenhuma cidade pré-selecionada
@@ -648,7 +651,15 @@ const state = {
 // Na página normal: contatos, modelos e agendamentos são salvos no servidor.
 // No robô do VPS (?robo=1): a página lê esses dados a cada minuto e dispara os agendamentos.
 const MODO_ROBO = new URLSearchParams(location.search).has('robo');
-const CHAVES_ESTADO = ['contatos','agendamentos','modelos','nextId','precosEditados','versaoCidades','planilhaCsvUrl'];
+const CHAVES_ESTADO = ['contatos','agendamentos','modelos','nextId','precosEditados','versaoCidades','planilhaCsvUrl','precosManualAte','precosFonte'];
+function _fimDoDia() { const d = new Date(); d.setHours(23,59,59,999); return d.getTime(); }
+function _renderFontePrecos() {
+  const el = document.getElementById('fonte-precos'); if(!el) return;
+  const manual = state.precosManualAte && Date.now() < state.precosManualAte;
+  el.innerHTML = state.precosFonte
+    ? `Preços em uso: <strong>${state.precosFonte}</strong>` + (manual ? '<br>🔒 Upload manual vale até o fim do dia — o robô não busca o Sheets hoje.' : (state.planilhaCsvUrl ? '<br>🔄 O robô atualiza pelo Sheets antes de cada disparo.' : ''))
+    : '';
+}
 let _estadoCarregado = false, _ultimoEstadoSalvo = null, _sincronizando = false;
 
 function _snapshotEstado() {
@@ -700,6 +711,7 @@ async function carregarEstadoServidor() {
     if(Array.isArray(hist)) state.historico = hist.map(h => ({ ...h, _sync: true }));
     _estadoCarregado = true;
     renderTudo();
+    _renderFontePrecos();
     _statusSync('☁️ Dados carregados do servidor — tudo é salvo automaticamente.');
   } catch(e) {
     console.error('Falha ao carregar dados do servidor:', e);
@@ -1685,6 +1697,9 @@ async function atualizarViaSheets() {
     statusEl.style.background = '#D4F4E2';
     statusEl.style.color = '#0F6B38';
     statusEl.innerHTML = `✓ <strong>${atualizados} preços atualizados</strong> do Google Sheets`;
+    if(!MODO_ROBO) state.precosManualAte = 0;
+    state.precosFonte = 'Google Sheets — ' + new Date().toLocaleString('pt-BR', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'});
+    _renderFontePrecos();
     btn.innerHTML = '<span style="font-size:16px">✅</span> Preços Atualizados';
     btn.style.background = '#1A7A4A';
 
@@ -1880,6 +1895,9 @@ function lerPlanilha(input) {
         statusEl.style.color = '#0F6B38';
         statusEl.innerHTML = `✓ <strong>${resCid.atualizados} preços atualizados</strong> da aba "${abaCidades}"` +
           (resCid.naoEncontradas.length ? `<br>⚠️ Não cadastradas: ${resCid.naoEncontradas.join(', ')}` : '');
+        state.precosManualAte = _fimDoDia();
+        state.precosFonte = 'Upload manual (' + file.name + ') — ' + new Date().toLocaleString('pt-BR', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'});
+        _renderFontePrecos();
         renderCidades();
         gerarTabelaImagem();
         toast(`Planilha carregada — ${resCid.atualizados} preços atualizados`, 'success');
@@ -2016,7 +2034,9 @@ async function verificarAgendamentos() {
     state[chave] = true;
     window.__gelatiOcupado = true;
     console.log(`Robô: disparando agendamento "${ag.nome}" (${horaAtual})`);
-    if(state.planilhaCsvUrl) { try { await atualizarViaSheets(); } catch(e) { console.error('Robô: falha ao atualizar preços do Sheets', e); } }
+    const manualValido = state.precosManualAte && Date.now() < state.precosManualAte;
+    if(state.planilhaCsvUrl && !manualValido) { try { await atualizarViaSheets(); } catch(e) { console.error('Robô: falha ao atualizar preços do Sheets', e); } }
+    else if(manualValido) console.log('Robô: usando preços do upload manual de hoje');
 
     // Dispara cada modelo vinculado
     for(const modeloId of (ag.modeloIds || [])) {
