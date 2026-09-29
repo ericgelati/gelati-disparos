@@ -342,6 +342,7 @@
     <div class="tab-view" id="tab-agendamentos">
       <div class="card">
         <div class="card-title">⏰ Agendamentos Automáticos</div>
+        <div style="font-size:12px;color:var(--cinza-4);margin:-4px 0 10px">☁️ Os agendamentos são disparados pelo servidor, 24h por dia — não é preciso deixar esta página aberta nem o computador ligado.</div>
         <div id="sch-list"></div>
         <button class="btn btn-primary" style="margin-top:8px" onclick="abrirModalAgendamento()">+ Novo Agendamento</button>
       </div>
@@ -427,6 +428,7 @@
           <p><strong>Instância:</strong> gelati-soja</p>
           <p><strong>Status:</strong> Evolution API v2.3.7 (Docker, HTTPS fixo)</p>
           <p style="margin-top:6px">Para reconectar o WhatsApp clique em <strong>📱 QR Code</strong>.</p>
+          <p id="sync-status" style="margin-top:6px">☁️ Configure a API para carregar os dados salvos no servidor.</p>
         </div>
       </div>
     </div>
@@ -619,6 +621,72 @@ const state = {
 };
 
 // Nenhuma cidade pré-selecionada
+
+// =================== SERVIDOR (dados salvos + robô) ===================
+// Na página normal: contatos, modelos e agendamentos são salvos no servidor.
+// No robô do VPS (?robo=1): a página lê esses dados a cada minuto e dispara os agendamentos.
+const MODO_ROBO = new URLSearchParams(location.search).has('robo');
+const CHAVES_ESTADO = ['contatos','agendamentos','modelos','nextId','precosEditados'];
+let _estadoCarregado = false, _ultimoEstadoSalvo = null, _sincronizando = false;
+
+function _snapshotEstado() {
+  const o = {}; CHAVES_ESTADO.forEach(k => o[k] = state[k]); return JSON.stringify(o);
+}
+async function apiGelati(rota, opcoes = {}) {
+  const { url, key } = state.apiConfig;
+  if(!url || !key) throw new Error('API não configurada');
+  const res = await fetch(`${url}/gelati/${rota}`, {
+    ...opcoes,
+    headers: { 'apikey': key, 'Content-Type': 'application/json', ...(opcoes.headers || {}) }
+  });
+  if(!res.ok) throw new Error(`Servidor respondeu HTTP ${res.status}`);
+  return res.json();
+}
+function _aplicarEstado(obj) {
+  if(!obj || typeof obj !== 'object') return;
+  CHAVES_ESTADO.forEach(k => { if(obj[k] !== undefined) state[k] = obj[k]; });
+}
+function _statusSync(txt) {
+  const el = document.getElementById('sync-status'); if(el) el.textContent = txt;
+}
+async function carregarEstadoServidor() {
+  try {
+    const est = await apiGelati('estado');
+    _aplicarEstado(est);
+    _ultimoEstadoSalvo = _snapshotEstado();
+    const hist = await apiGelati('historico');
+    if(Array.isArray(hist)) state.historico = hist.map(h => ({ ...h, _sync: true }));
+    _estadoCarregado = true;
+    renderTudo();
+    _statusSync('☁️ Dados carregados do servidor — tudo é salvo automaticamente.');
+  } catch(e) {
+    console.error('Falha ao carregar dados do servidor:', e);
+    _statusSync('⚠️ Não foi possível carregar os dados do servidor: ' + e.message);
+    toast('Não foi possível carregar contatos/agendamentos do servidor', 'error');
+  }
+}
+async function sincronizarServidor() {
+  if(!_estadoCarregado || _sincronizando) return;
+  _sincronizando = true;
+  try {
+    if(!MODO_ROBO) {
+      const snap = _snapshotEstado();
+      if(snap !== _ultimoEstadoSalvo) {
+        await apiGelati('estado', { method: 'PUT', body: snap });
+        _ultimoEstadoSalvo = snap;
+        _statusSync('☁️ Salvo no servidor às ' + new Date().toLocaleTimeString('pt-BR'));
+      }
+    }
+    const novos = state.historico.filter(h => !h._sync);
+    if(novos.length) {
+      await apiGelati('historico', { method: 'POST', body: JSON.stringify(novos.map(({_sync, ...h}) => h)) });
+      novos.forEach(h => h._sync = true);
+    }
+  } catch(e) {
+    console.error('Falha ao salvar no servidor:', e);
+    _statusSync('⚠️ Falha ao salvar no servidor — tentando de novo...');
+  } finally { _sincronizando = false; }
+}
 
 // =================== GETTERS ===================
 function getPreco(idx, mesIdx) {
@@ -1113,6 +1181,7 @@ async function salvarAPI() {
   document.getElementById('api-status-text').textContent = 'Configurado — testando conexão...';
   toast('Dados salvos. Testando conexão...', 'success');
   await testarConexao();
+  if(!_estadoCarregado) await carregarEstadoServidor();
 }
 
 async function testarConexao() {
@@ -1786,11 +1855,14 @@ window.addEventListener('DOMContentLoaded', () => {
 
 // =================== AGENDAMENTO AUTOMÁTICO ===================
 async function verificarAgendamentos() {
+  if(!MODO_ROBO) return; // os agendamentos são disparados pelo robô no servidor
+  try { _aplicarEstado(await apiGelati('estado')); } catch(e) { console.error('Robô: falha ao ler dados', e); return; }
+  if(!state.conectado) await testarConexao();
   if(!state.conectado) return; // só dispara se estiver conectado
   const agora = new Date();
   const horaAtual = agora.getHours().toString().padStart(2,'0') + ':' + agora.getMinutes().toString().padStart(2,'0');
   const diaAtual  = agora.getDay(); // 0=Dom ... 6=Sáb
-  const dataAtual = agora.toISOString().slice(0,10); // YYYY-MM-DD
+  const dataAtual = agora.toLocaleDateString('en-CA'); // YYYY-MM-DD no fuso local
 
   for(const ag of state.agendamentos) {
     if(!ag.ativo) continue;
@@ -1804,6 +1876,9 @@ async function verificarAgendamentos() {
     const chave = `disparado_${ag.id}_${dataAtual}_${horaAtual}`;
     if(state[chave]) continue;
     state[chave] = true;
+    window.__gelatiOcupado = true;
+    console.log(`Robô: disparando agendamento "${ag.nome}" (${horaAtual})`);
+    try { await atualizarViaSheets(); } catch(e) { console.error('Robô: falha ao atualizar preços do Sheets', e); }
 
     // Dispara cada modelo vinculado
     for(const modeloId of (ag.modeloIds || [])) {
@@ -1835,7 +1910,10 @@ async function verificarAgendamentos() {
         renderHistorico();
       }
       toast(`✓ Agendamento "${ag.nome}" — "${modelo.nome}" concluído`, 'success');
+      console.log(`Robô: "${ag.nome}" / "${modelo.nome}" concluído`);
     }
+    await sincronizarServidor();
+    window.__gelatiOcupado = false;
   }
 }
 
@@ -1855,6 +1933,9 @@ window.addEventListener('DOMContentLoaded',()=>{
       testarConexao();
     }
   } catch(e) {}
+  if(state.apiConfig.url && state.apiConfig.key) carregarEstadoServidor();
+  setInterval(sincronizarServidor, 3000);
+  window.addEventListener('beforeunload', () => { sincronizarServidor(); });
   setInterval(gerarTabelaImagem, 60000);
 
   // Verifica agendamentos a cada minuto
