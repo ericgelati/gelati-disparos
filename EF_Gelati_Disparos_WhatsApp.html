@@ -597,6 +597,9 @@ const DADOS_CIDADES = [
   { nome:'SÃO VICENTE DE MINAS', fretes:[0,0,0,0,0], precos:[136.5, 135.4, 136.4, 138.6, 139.6] },
   { nome:'TRÊS CORAÇÕES', fretes:[0,0,0,0,0], precos:[138.6, 137.5, 138.5, 140.1, 141.4] },
   { nome:'TRÊS PONTAS', fretes:[0,0,0,0,0], precos:[138.0, 136.9, 138.2, 139.8, 141.1] },
+  // Cidades novas ficam sempre no FIM da lista (os modelos guardam a posição de cada cidade)
+  { nome:'LUZ', fretes:[0,0,0,0,0], precos:[134.1, 133.0, 134.0, 135.6, 137.2] },                       // mesma base de Bom Despacho
+  { nome:'SÃO SEBASTIÃO DO PARAÍSO', fretes:[0,0,0,0,0], precos:[135.9, 134.2, 134.6, 136.2, 138.4] }, // mesma base de Madre de Deus de Minas
 ];
 const VERSAO_CIDADES = 2;
 // Lista antiga (versão 1) → nomes novos, para converter modelos já salvos
@@ -1836,11 +1839,14 @@ function processarPrecosPorCidades(linhas) {
   for(let r = cab + 1; r < linhas.length; r++) {
     const nome = String((linhas[r] || [])[0] || '').trim();
     if(!nome || /^pagamento/i.test(nome)) continue;
-    const valores = Object.entries(colMes).map(([ci,mi]) => [mi, _numeroPlanilha(linhas[r][ci])]).filter(([,v]) => !isNaN(v) && v >= 50);
+    const todos = Object.entries(colMes).map(([ci,mi]) => [mi, _numeroPlanilha(linhas[r][ci])]);
+    const valores = todos.filter(([,v]) => !isNaN(v) && v >= 50);
     if(!valores.length) continue;
     const idx = _indiceCidade(nome, mapa);
     if(idx === undefined) { naoEncontradas.push(nome); continue; }
     valores.forEach(([mi,v]) => { state.precosEditados[idx + '-' + mi] = Math.round(v*10)/10; atualizados++; });
+    // mês sem preço na planilha (vazio ou #NUM!) = sem referência hoje → zera, para não sair o preço antigo
+    todos.filter(([,v]) => isNaN(v) || v < 50).forEach(([mi]) => { state.precosEditados[idx + '-' + mi] = 0; });
   }
   if(naoEncontradas.length) console.warn('Cidades da planilha não cadastradas no sistema:', naoEncontradas);
   return { atualizados, naoEncontradas };
